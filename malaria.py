@@ -225,8 +225,46 @@ with col_allocation:
     st.markdown(f'<div class="recommendation-box">👉 {top_country_name}: {top_funding:.1f}%<br/>Priority: Highest</div>', unsafe_allow_html=True)
 
 # ============================================================
-# COUNTRY RANKINGS (SIMPLE TABLE)
+# SIMPLE EXPLANATION - HOW METRICS BECOME FUNDING (LAYMAN'S TERMS)
 # ============================================================
+st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
+st.markdown("### 🎓 HOW WE DECIDE FUNDING (SIMPLE VERSION)")
+
+explanation_col1, explanation_col2, explanation_col3 = st.columns(3)
+
+with explanation_col1:
+    st.markdown("#### 📊 **METRIC 1: DEATHS**")
+    st.markdown(f"How many people die from malaria each year?\n\n**{top_country_name}**: {int(top_country['deaths']):,} deaths/year\n\n👉 More deaths = more urgent funding needed")
+
+with explanation_col2:
+    st.markdown("#### 📈 **METRIC 2: CASES PER POPULATION**")
+    st.markdown(f"How many people get sick per 1,000 people?\n\n**{top_country_name}**: {top_country['case_rate']:.1f} cases/1K\n\n👉 Higher rate = healthcare system is overloaded")
+
+with explanation_col3:
+    st.markdown("#### ⚠️ **METRIC 3: DEATH RATE (CFR)**")
+    st.markdown(f"What % of infected people die?\n\n**{top_country_name}**: {top_country['cfr']:.1f}%\n\n👉 Higher % = weak healthcare (poor treatment)")
+
+st.markdown("---")
+
+# Create simple breakdown for top country
+st.markdown("#### 💰 **Example: Why {0} Gets {1:.1f}% of Funding**".format(top_country_name, top_funding))
+
+breakdown_df = pd.DataFrame({
+    'Factor': ['Deaths (Most Lives Lost)', 'Case Rate (System Strain)', 'CFR (Healthcare Weakness)'],
+    'Why It Matters': [
+        'Raw count of lives at stake',
+        'Shows if system is overwhelmed',
+        'Shows if healthcare can treat properly'
+    ],
+    'Importance': ['40% weight', '35% weight', '25% weight'],
+    f'{top_country_name} Rank': ['🥇 Highest', f'🥇 Highest' if top_country['case_rate'] == priority_df['case_rate'].max() else '🥈 High' if top_country['case_rate'] > priority_df['case_rate'].median() else '🥉 Moderate', 
+                                  '🥇 Highest' if top_country['cfr'] == priority_df['cfr'].max() else '🥈 High' if top_country['cfr'] > priority_df['cfr'].median() else '🥉 Moderate']
+})
+
+st.dataframe(breakdown_df, use_container_width=True, hide_index=True)
+
+st.info("💡 **Bottom Line**: {0} is the top priority because it has the **most lives at stake** (highest deaths), a **strained health system** (high case rate), and **poor treatment outcomes** (high death rate). That's why it gets {1:.1f}% of the funding.".format(top_country_name, top_funding))
+
 st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
 st.markdown("### 🔬 EPIDEMIOLOGICAL PROFILE - All Countries")
 
@@ -312,4 +350,4 @@ with col_info:
     st.info("📊 Compare Vietnam's burden against other countries to understand relative urgency")
 
 st.markdown("---")
-st.markdown("💡 **How We Prioritize Your Funding**: We look at three things: (1) **Mortality Risk** (40%) - How many people die from malaria in each country? This tells us where healthcare is weakest. (2) **Population Impact** (35%) - How many people in each country get malaria? This shows scale of the problem. (3) **Total Deaths** (25%) - Raw count of lives at stake. Countries with deadlier malaria, worse healthcare systems, or more deaths get prioritized first. | **Note**: Using Synthetic Surveillance Data (2015-2025) | Last Updated: 2026")
+st.markdown("💡 **How We Prioritize Your Funding**: Evidence-based allocation uses three complementary epidemiological indicators: (1) **Absolute Mortality Burden** (40%) — Total deaths per year. This is the most direct measure of public health impact and what funding can reduce. Countries with more deaths require more resources to prevent them. (2) **Disease Burden Intensity** (35%) — Confirmed cases per 1,000 population. This indicates disease prevalence and concentration in each country's healthcare system. Higher rates suggest strained prevention/surveillance capacity. (3) **Mortality Risk** (25%) — Case Fatality Rate (CFR). This reflects healthcare system weakness—where people die despite contracting malaria. High CFR indicates treatment delays, drug resistance, or limited clinical capacity that funding can address. **Rationale**: While absolute deaths are paramount, intensity and CFR together identify where interventions have highest impact-per-dollar, accounting for population differences and healthcare gaps. | **Note**: Using Synthetic Surveillance Data (2015-2025) | Last Updated: 2026")
