@@ -97,9 +97,49 @@ col4.metric("🗺️ Countries Affected", f"{affected_countries}")
 st.markdown("---")
 
 # ============================================================
-# FUNDING PRIORITY RANKING - THE KEY DECISION
+# PRIORITY SCORING METHODOLOGY (TRANSPARENCY FIRST)
 # ============================================================
-st.subheader("🎯 FUNDING PRIORITY RANKING (Your Decision)")
+st.subheader("🔍 How We Calculate Priority Score (Full Transparency)")
+
+methodology_col1, methodology_col2, methodology_col3 = st.columns(3)
+
+with methodology_col1:
+    st.markdown("""
+    **📊 Case Volume (35%)**
+    
+    Reflects absolute disease burden.
+    - Countries with more cases = higher weight
+    - Normalized by highest case count
+    - Formula: (Cases / Max Cases) × 35
+    """)
+
+with methodology_col2:
+    st.markdown("""
+    **☠️ Deaths (35%)**
+    
+    Reflects severity & mortality impact.
+    - Deaths are highest priority
+    - Directly measure program urgency
+    - Formula: (Deaths / Max Deaths) × 35
+    """)
+
+with methodology_col3:
+    st.markdown("""
+    **📈 Case Rate (30%)**
+    
+    Reflects population-level impact.
+    - Cases per 1000 population
+    - Controls for country size
+    - Formula: (Rate / Max Rate) × 30
+    """)
+
+st.info("**Final Score = Case Volume + Deaths + Case Rate** (Range: 0-100) | **Higher score = Needs more funding**")
+st.markdown("---")
+
+# ============================================================
+# FUNDING PRIORITY RANKING & COMPARISON (SIDE-BY-SIDE)
+# ============================================================
+st.subheader("🎯 FUNDING PRIORITY RANKING vs Detailed Comparison")
 
 clmv_countries = ['Cambodia', 'Laos', 'Myanmar', 'Vietnam']
 priority_df = df[df['country'].isin(clmv_countries)].groupby('country').agg({
@@ -124,38 +164,39 @@ priority_df['priority_score'] = (
 priority_df = priority_df.sort_values('priority_score', ascending=False).reset_index(drop=True)
 priority_df['rank'] = range(1, len(priority_df) + 1)
 
-# Visualization: Priority Ranking Bar Chart
-fig_priority = px.bar(
-    priority_df,
-    x='country',
-    y='priority_score',
-    text='priority_score',
-    color='priority_score',
-    color_continuous_scale=['#51cf66', '#ffa94d', '#ff6b6b'],
-    labels={'priority_score': 'Priority Score', 'country': 'Country'},
-    hover_data={'priority_score': ':.1f', 'confirmed_cases': ',.0f', 'deaths': ',.0f'},
-    title="Priority Score: Higher = More Urgent Funding Need"
-)
-fig_priority.update_layout(height=350, showlegend=False)
-fig_priority.add_annotation(
-    text="Scale: 0-100 | Based on: Case Volume (35%) + Deaths (35%) + Case Rate (30%)",
-    xref="paper", yref="paper", x=0.5, y=-0.15, showarrow=False, font=dict(size=10, color="gray")
-)
-st.plotly_chart(fig_priority, use_container_width=True)
+# Side-by-side layout: Chart on left, Table on right
+col_chart, col_table = st.columns([1.2, 1])
 
-# Detailed Comparison Table
-st.markdown("### Detailed Country Comparison")
-comparison_table = priority_df[['rank', 'country', 'confirmed_cases', 'deaths', 'case_rate', 'cfr', 'priority_score']].copy()
-comparison_table.columns = ['Rank', 'Country', 'Total Cases', 'Total Deaths', 'Case Rate\n(per 1000)', 'Fatality Rate\n(%)', 'Priority\nScore']
-comparison_table['Total Cases'] = comparison_table['Total Cases'].apply(lambda x: f"{int(x):,}")
-comparison_table['Total Deaths'] = comparison_table['Total Deaths'].apply(lambda x: f"{int(x):,}")
+# LEFT: Visualization: Priority Ranking Bar Chart
+with col_chart:
+    fig_priority = px.bar(
+        priority_df,
+        x='country',
+        y='priority_score',
+        text='priority_score',
+        color='priority_score',
+        color_continuous_scale=['#51cf66', '#ffa94d', '#ff6b6b'],
+        labels={'priority_score': 'Priority Score', 'country': 'Country'},
+        hover_data={'priority_score': ':.1f', 'confirmed_cases': ',.0f', 'deaths': ',.0f'},
+        title="Priority Ranking by Score"
+    )
+    fig_priority.update_layout(height=450, showlegend=False, xaxis_tickangle=-45)
+    st.plotly_chart(fig_priority, use_container_width=True)
 
-# Format for display
-st.dataframe(
-    comparison_table.style.format({'Case Rate\n(per 1000)': '{:.2f}', 'Fatality Rate\n(%)': '{:.2f}', 'Priority\nScore': '{:.1f}'}),
-    use_container_width=True,
-    hide_index=True
-)
+# RIGHT: Detailed Comparison Table
+with col_table:
+    st.markdown("**Detailed Metrics by Country**")
+    comparison_table = priority_df[['rank', 'country', 'confirmed_cases', 'deaths', 'case_rate', 'cfr', 'priority_score']].copy()
+    comparison_table.columns = ['Rank', 'Country', 'Cases', 'Deaths', 'Rate/1K', 'CFR%', 'Score']
+    comparison_table['Cases'] = comparison_table['Cases'].apply(lambda x: f"{int(x):,}")
+    comparison_table['Deaths'] = comparison_table['Deaths'].apply(lambda x: f"{int(x):,}")
+    
+    st.dataframe(
+        comparison_table.style.format({'Rate/1K': '{:.1f}', 'CFR%': '{:.2f}', 'Score': '{:.1f}'}),
+        use_container_width=True,
+        hide_index=True,
+        height=450
+    )
 
 st.markdown("---")
 
@@ -223,32 +264,49 @@ agg_df['period'] = agg_df['year'].astype(str) + '-' + agg_df['month'].astype(str
 agg_df = agg_df.sort_values(['year', 'month'])
 
 fig_ts = go.Figure()
+
+# Add Cases trace (left y-axis)
 fig_ts.add_trace(go.Scatter(
     x=agg_df['period'], 
     y=agg_df['confirmed_cases'], 
     name="Cases", 
     line=dict(color='#1f77b4', width=2),
     yaxis='y1',
-    hovertemplate='Period: %{x}<br>Cases: %{y:,}<extra></extra>'
+    hovertemplate='<b>%{x}</b><br>Cases: %{y:,}<extra></extra>'
 ))
+
+# Add Deaths trace (right y-axis)
 fig_ts.add_trace(go.Scatter(
     x=agg_df['period'], 
     y=agg_df['deaths'], 
     name="Deaths", 
     line=dict(color='#d62728', width=2),
     yaxis='y2',
-    hovertemplate='Period: %{x}<br>Deaths: %{y:,}<extra></extra>'
+    hovertemplate='<b>%{x}</b><br>Deaths: %{y:,}<extra></extra>'
 ))
 
 fig_ts.update_layout(
-    title="Cases & Deaths Timeline",
-    xaxis_title="Month",
-    yaxis=dict(title="Cases", titlefont=dict(color='#1f77b4'), tickfont=dict(color='#1f77b4')),
-    yaxis2=dict(title="Deaths", titlefont=dict(color='#d62728'), tickfont=dict(color='#d62728'), anchor="x", overlaying="y1"),
+    title="Cases & Deaths Timeline (Monthly)",
+    xaxis_title="Period",
+    yaxis=dict(
+        title="Cases",
+        titlefont=dict(color='#1f77b4'),
+        tickfont=dict(color='#1f77b4'),
+        side='left'
+    ),
+    yaxis2=dict(
+        title="Deaths",
+        titlefont=dict(color='#d62728'),
+        tickfont=dict(color='#d62728'),
+        side='right',
+        overlaying='y'
+    ),
     hovermode='x unified',
     height=350,
-    xaxis=dict(tickangle=-45)
+    xaxis=dict(tickangle=-45),
+    legend=dict(x=0.01, y=0.99)
 )
+
 st.plotly_chart(fig_ts, use_container_width=True)
 
 st.markdown("---")
@@ -258,68 +316,66 @@ st.markdown("---")
 # ============================================================
 st.subheader("💰 FUNDING ALLOCATION RECOMMENDATION")
 
+st.markdown("""
+**How We Convert Priority Scores to Funding Percentages:**
+- Each country's priority score reflects their urgency (0-100)
+- Total pool of funds distributed proportionally by score
+- Formula: (Country Score / Sum of All Scores) × 100%
+- **Result:** Countries with higher need receive more funding
+""")
+
 summary_df = priority_df[['country', 'priority_score']].copy()
 total_score = summary_df['priority_score'].sum()
 summary_df['funding_pct'] = (summary_df['priority_score'] / total_score * 100).round(1)
 summary_df = summary_df.sort_values('funding_pct', ascending=False)
 
-fig_alloc = px.bar(
-    summary_df,
-    x='country',
-    y='funding_pct',
-    text='funding_pct',
-    color='funding_pct',
-    color_continuous_scale='Reds',
-    labels={'funding_pct': 'Recommended Allocation (%)', 'country': 'Country'},
-    title="Recommended Funding Distribution by Country"
-)
-fig_alloc.update_layout(height=350, showlegend=False)
-st.plotly_chart(fig_alloc, use_container_width=True)
+# Side-by-side: Chart + Summary Table
+col_alloc_chart, col_alloc_table = st.columns([1.2, 1])
 
-# Final Recommendation Table
-st.markdown("### Funding Recommendation Summary")
-rec_table = summary_df[['country', 'funding_pct', 'priority_score']].copy()
-rec_table.columns = ['Country', 'Recommended Allocation (%)', 'Priority Score']
+# LEFT: Bar Chart
+with col_alloc_chart:
+    fig_alloc = px.bar(
+        summary_df,
+        x='country',
+        y='funding_pct',
+        text='funding_pct',
+        color='funding_pct',
+        color_continuous_scale='Reds',
+        labels={'funding_pct': 'Recommended Allocation (%)', 'country': 'Country'},
+        title="Recommended Funding Distribution (%)"
+    )
+    fig_alloc.update_traces(texttemplate='%{text:.1f}%', textposition='auto')
+    fig_alloc.update_layout(height=450, showlegend=False, xaxis_tickangle=-45)
+    st.plotly_chart(fig_alloc, use_container_width=True)
 
-st.dataframe(
-    rec_table.style.format({'Recommended Allocation (%)': '{:.1f}%', 'Priority Score': '{:.1f}'}),
-    use_container_width=True,
-    hide_index=True
-)
-
-st.markdown("---")
-
-# ============================================================
-# FOOTER & METHODOLOGY
-# ============================================================
-st.subheader("📌 Methodology & Data Notes")
-
-col_method1, col_method2 = st.columns(2)
-
-with col_method1:
-    st.markdown("""
-    **Priority Scoring Formula:**
-    - Case Volume: 35% (absolute burden)
-    - Deaths: 35% (severity)
-    - Case Rate: 30% (population impact)
+# RIGHT: Summary Table with Recommendation
+with col_alloc_table:
+    st.markdown("**Allocation Breakdown**")
+    rec_table = summary_df[['country', 'priority_score', 'funding_pct']].copy()
+    rec_table.columns = ['Country', 'Priority Score', 'Allocation (%)']
+    rec_table = rec_table.sort_values('Allocation (%)', ascending=False)
     
-    **Data Quality:**
-    - Time Period: 2015-2025 (11 years)
-    - Countries: 4 CLMV nations
-    - Records: 44,778 surveillance entries
-    """)
+    st.dataframe(
+        rec_table.style.format({'Priority Score': '{:.1f}', 'Allocation (%)': '{:.1f}%'}),
+        use_container_width=True,
+        hide_index=True,
+        height=450
+    )
 
-with col_method2:
-    st.markdown("""
-    **Key Metrics:**
-    - Confirmed Cases: Laboratory-verified
-    - Deaths: Malaria-attributed mortality
-    - Case Rate: Cases per 1000 population
-    - CFR: Case Fatality Rate (%)
-    
-    **Source:** Malaria Surveillance System
-    **Dashboard Purpose:** Aid resource allocation decisions
-    """)
+# KEY RECOMMENDATION BOX
+st.info(f"""
+### 🎯 RECOMMENDED ALLOCATION DECISION:
+
+**Total Score Sum:** {total_score:.1f}
+
+Allocate funding as follows:
+- **{summary_df.iloc[0]['country']}**: {summary_df.iloc[0]['funding_pct']:.1f}% ({summary_df.iloc[0]['priority_score']:.1f}/100 priority)
+- **{summary_df.iloc[1]['country']}**: {summary_df.iloc[1]['funding_pct']:.1f}% ({summary_df.iloc[1]['priority_score']:.1f}/100 priority)
+- **{summary_df.iloc[2]['country']}**: {summary_df.iloc[2]['funding_pct']:.1f}% ({summary_df.iloc[2]['priority_score']:.1f}/100 priority)
+- **{summary_df.iloc[3]['country']}**: {summary_df.iloc[3]['funding_pct']:.1f}% ({summary_df.iloc[3]['priority_score']:.1f}/100 priority)
+
+*This allocation maximizes impact by directing resources proportionally to burden intensity.*
+""")
 
 st.markdown("---")
 st.caption("🔒 Confidential | For Funding Agency Use Only | Data Source: Regional Malaria Surveillance System")
