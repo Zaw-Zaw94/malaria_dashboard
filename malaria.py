@@ -274,25 +274,59 @@ country_year_df = df.groupby(['year', 'country']).agg({
     'confirmed_cases': 'sum'
 }).reset_index().sort_values('year')
 
-col_cases, col_info = st.columns([2, 1])
+# Highlight Vietnam with bold color, others more subtle
+color_map = {
+    'Vietnam': '#ff4757',  # Bold red - focal point
+    'Myanmar': '#ffa502',   # Orange
+    'Cambodia': '#95a5a6',  # Gray
+    'Laos': '#95a5a6'       # Gray
+}
 
+fig_trend = px.line(
+    country_year_df,
+    x='year',
+    y='confirmed_cases',
+    color='country',
+    markers=True,
+    title='10-Year Malaria Cases Trend - Focus: Vietnam',
+    labels={'confirmed_cases': 'Annual Cases', 'year': 'Year', 'country': 'Country'},
+    color_discrete_map=color_map
+)
+
+# Make Vietnam line thicker
+for trace in fig_trend.data:
+    if trace.name == 'Vietnam':
+        trace.line.width = 4
+        trace.marker.size = 10
+    else:
+        trace.line.width = 2
+        trace.marker.size = 6
+
+fig_trend.update_layout(
+    height=400,  # Increased from 220
+    hovermode='x unified',
+    showlegend=True,
+    plot_bgcolor='rgba(240,240,240,0.5)',
+    yaxis_title='Annual Cases',
+    xaxis_title='Year',
+    font=dict(size=12)
+)
+
+st.plotly_chart(fig_trend, use_container_width=True)
+
+# Context below chart
+col_cases, col_info = st.columns([2, 1])
 with col_cases:
-    fig_trend = px.line(
-        country_year_df,
-        x='year',
-        y='confirmed_cases',
-        color='country',
-        markers=True,
-        title='10-Year Trend',
-        labels={'confirmed_cases': 'Cases', 'year': 'Year', 'country': 'Country'}
-    )
-    fig_trend.update_layout(height=220, hovermode='x unified', showlegend=True)
-    st.plotly_chart(fig_trend, use_container_width=True)
+    vietnam_trend = country_year_df[country_year_df['country'] == 'Vietnam'].sort_values('year')
+    if len(vietnam_trend) > 1:
+        vietnam_start = vietnam_trend.iloc[0]['confirmed_cases']
+        vietnam_end = vietnam_trend.iloc[-1]['confirmed_cases']
+        vietnam_change = ((vietnam_end - vietnam_start) / vietnam_start * 100) if vietnam_start > 0 else 0
+        st.write(f"**Vietnam Trajectory**: {int(vietnam_start):,} cases (2015) → {int(vietnam_end):,} cases (2025) | Change: {vietnam_change:+.1f}%")
 
 with col_info:
-    st.markdown("**Trend**")
-    trend_status = "📉 Declining" if total_cases > 0 else "📈 Rising"
-    st.info(f"{trend_status} - Progress is happening BUT continued funding needed to maintain gains")
+    st.markdown("**Interpretation**")
+    st.info("📊 Compare Vietnam's burden against other countries to understand relative urgency")
 
 st.markdown("---")
 st.markdown("💡 **How We Prioritize Your Funding**: We look at three things: (1) **Mortality Risk** (40%) - How many people die from malaria in each country? This tells us where healthcare is weakest. (2) **Population Impact** (35%) - How many people in each country get malaria? This shows scale of the problem. (3) **Total Deaths** (25%) - Raw count of lives at stake. Countries with deadlier malaria, worse healthcare systems, or more deaths get prioritized first. | **Note**: Using Synthetic Surveillance Data (2015-2025) | Last Updated: 2026")
