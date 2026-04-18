@@ -99,6 +99,44 @@ st.markdown("**Target: Funding Agency Resource Allocation**")
 st.markdown("**Answer: Which country needs most funding?**")
 st.markdown("---")
 
+# ============================================================
+# CLMV COUNTRIES FUNDING ANALYSIS
+# ============================================================
+st.subheader("🌏 CLMV Countries Funding Needs Analysis")
+
+clmv_countries = ['Cambodia', 'Laos', 'Myanmar', 'Vietnam']
+clmv_df = df[df['country'].isin(clmv_countries)].groupby('country').agg({
+    'confirmed_cases': 'sum',
+    'deaths': 'sum',
+    'severe_cases': 'sum',
+    'population': 'mean'
+}).reset_index()
+
+clmv_df['case_rate'] = (clmv_df['confirmed_cases'] / clmv_df['population'] * 1000).round(2)
+clmv_df['mortality_rate'] = (clmv_df['deaths'] / clmv_df['population'] * 1000).round(2)
+clmv_df['cfr'] = (clmv_df['deaths'] / clmv_df['confirmed_cases'] * 100).round(2)
+clmv_df = clmv_df.sort_values('confirmed_cases', ascending=False)
+
+fig_clmv = px.bar(
+    clmv_df,
+    x='country',
+    y='confirmed_cases',
+    text=['confirmed_cases'],
+    color='deaths',
+    color_continuous_scale="Reds",
+    labels={'confirmed_cases': 'Total Cases', 'country': 'Country', 'deaths': 'Deaths'},
+    hover_data=['deaths', 'case_rate', 'cfr']
+)
+fig_clmv.update_layout(height=350, title="CLMV Countries: Total Malaria Burden")
+st.plotly_chart(fig_clmv, use_container_width=True)
+
+st.markdown("### CLMV Summary Table")
+clmv_summary = clmv_df[['country', 'confirmed_cases', 'deaths', 'cfr', 'case_rate']].copy()
+clmv_summary.columns = ['Country', 'Total Cases', 'Total Deaths', 'Case Fatality Rate (%)', 'Case Rate (per 1000)']
+st.dataframe(clmv_summary.to_dict('records'), use_container_width=True)
+
+st.markdown("---")
+
 # KPI Cards
 col1, col2, col3, col4, col5, col6 = st.columns(6)
 
@@ -107,6 +145,7 @@ total_deaths = filtered_df['deaths'].sum()
 total_pf = filtered_df['pf_cases'].sum()
 total_pv = filtered_df['pv_cases'].sum()
 total_severe = filtered_df['severe_cases'].sum()
+cfr = (total_deaths / total_cases * 100) if total_cases > 0 else 0
 
 # Calculate trend (compare first and last year)
 first_year = int(min(df['year'].unique())) if selected_year == 'All' else selected_year
@@ -117,10 +156,10 @@ cases_last = df[(df['year'] == last_year)]['confirmed_cases'].sum()
 reduction = ((cases_first - cases_last) / cases_first * 100) if cases_first > 0 else 0
 
 col1.metric("Total Cases", f"{total_cases:,.0f}")
-col2.metric("Deaths", f"{total_deaths:,.0f}")
-col3.metric("Pf Cases", f"{total_pf:,.0f}")
-col4.metric("Pv Cases", f"{total_pv:,.0f}")
-col5.metric("Severe", f"{total_severe:,.0f}")
+col2.metric("Total Deaths", f"{total_deaths:,.0f}")
+col3.metric("Case Fatality Rate", f"{cfr:.2f}%")
+col4.metric("Pf Cases", f"{total_pf:,.0f}")
+col5.metric("Pv Cases", f"{total_pv:,.0f}")
 col6.metric(f"Trend ({first_year}→{last_year})", f"{reduction:.1f}%")
 
 st.markdown("---")
@@ -202,6 +241,82 @@ fig1.update_layout(
 st.plotly_chart(fig1, use_container_width=True)
 
 # ============================================================
+# 10-YEAR TRENDS: Cases & Deaths by Country (Side-by-Side)
+# ============================================================
+st.subheader("📊 10-Year Trends: Cases & Deaths by Country")
+
+country_year_df = df.groupby(['year', 'country']).agg({
+    'confirmed_cases': 'sum',
+    'deaths': 'sum'
+}).reset_index().sort_values('year')
+
+col_cases, col_deaths = st.columns(2)
+
+with col_cases:
+    fig_country_cases = px.line(
+        country_year_df,
+        x='year',
+        y='confirmed_cases',
+        color='country',
+        markers=True,
+        labels={'confirmed_cases': 'Cases', 'year': 'Year', 'country': 'Country'},
+        title="Cases by Country (2015-2025)"
+    )
+    fig_country_cases.update_layout(height=400, hovermode='x unified')
+    st.plotly_chart(fig_country_cases, use_container_width=True)
+
+with col_deaths:
+    fig_country_deaths = px.line(
+        country_year_df,
+        x='year',
+        y='deaths',
+        color='country',
+        markers=True,
+        labels={'deaths': 'Deaths', 'year': 'Year', 'country': 'Country'},
+        title="Deaths by Country (2015-2025)"
+    )
+    fig_country_deaths.update_layout(height=400, hovermode='x unified')
+    st.plotly_chart(fig_country_deaths, use_container_width=True)
+
+# ============================================================
+# 10-YEAR TRENDS: Cases & Deaths by Region (Side-by-Side)
+# ============================================================
+st.subheader("📊 10-Year Trends: Cases & Deaths by Region")
+
+region_year_df = df.groupby(['year', 'region']).agg({
+    'confirmed_cases': 'sum',
+    'deaths': 'sum'
+}).reset_index().sort_values('year')
+
+col_reg_cases, col_reg_deaths = st.columns(2)
+
+with col_reg_cases:
+    fig_region_cases = px.line(
+        region_year_df,
+        x='year',
+        y='confirmed_cases',
+        color='region',
+        markers=True,
+        labels={'confirmed_cases': 'Cases', 'year': 'Year', 'region': 'Region'},
+        title="Cases by Region (2015-2025)"
+    )
+    fig_region_cases.update_layout(height=400, hovermode='x unified')
+    st.plotly_chart(fig_region_cases, use_container_width=True)
+
+with col_reg_deaths:
+    fig_region_deaths = px.line(
+        region_year_df,
+        x='year',
+        y='deaths',
+        color='region',
+        markers=True,
+        labels={'deaths': 'Deaths', 'year': 'Year', 'region': 'Region'},
+        title="Deaths by Region (2015-2025)"
+    )
+    fig_region_deaths.update_layout(height=400, hovermode='x unified')
+    st.plotly_chart(fig_region_deaths, use_container_width=True)
+
+# ============================================================
 # Two column layout: Regional & Species
 # ============================================================
 col_left, col_right = st.columns(2)
@@ -278,78 +393,109 @@ fig_district.update_layout(height=400)
 st.plotly_chart(fig_district, use_container_width=True)
 
 # ============================================================
-# Border Area Analysis (Matrix Heatmap)
+# Border Area Analysis (Geographic Heatmap)
 # ============================================================
-st.subheader("🚧 Border Area Analysis (Matrix Heatmap)")
+st.subheader("🚧 Border Area Analysis (Geographic Heatmap)")
 
-# Create pivot table: Region x Border Area Type
-matrix_df = filtered_df.groupby(['region', 'is_border_area']).agg({
+# District coordinates mapping (approximate centroids for major districts in CLMV)
+district_coords = {
+    # Myanmar
+    'Bagan': {'lat': 21.17, 'lon': 94.86, 'country': 'Myanmar'},
+    'Mandalay': {'lat': 21.97, 'lon': 96.08, 'country': 'Myanmar'},
+    'Kalaw': {'lat': 20.44, 'lon': 96.54, 'country': 'Myanmar'},
+    'Tachileik': {'lat': 20.44, 'lon': 99.88, 'country': 'Myanmar'},
+    'Mawlamyine': {'lat': 16.49, 'lon': 97.64, 'country': 'Myanmar'},
+    'Dawei': {'lat': 14.08, 'lon': 98.20, 'country': 'Myanmar'},
+    
+    # Thailand (for reference)
+    'Mae Sai': {'lat': 20.41, 'lon': 100.08, 'country': 'Thailand'},
+    'Mae Sot': {'lat': 16.72, 'lon': 98.55, 'country': 'Thailand'},
+    
+    # Laos
+    'Luang Namtha': {'lat': 20.94, 'lon': 101.41, 'country': 'Laos'},
+    'Muang Xai': {'lat': 20.73, 'lon': 101.97, 'country': 'Laos'},
+    'Vientiane': {'lat': 17.97, 'lon': 102.63, 'country': 'Laos'},
+    'Savannakhet': {'lat': 16.56, 'lon': 104.76, 'country': 'Laos'},
+    'Pakse': {'lat': 15.12, 'lon': 105.81, 'country': 'Laos'},
+    
+    # Cambodia
+    'Banteay Meanchey': {'lat': 13.74, 'lon': 102.75, 'country': 'Cambodia'},
+    'Siem Reap': {'lat': 13.36, 'lon': 103.85, 'country': 'Cambodia'},
+    'Stung Treng': {'lat': 13.53, 'lon': 105.97, 'country': 'Cambodia'},
+    'Battambang': {'lat': 13.10, 'lon': 103.20, 'country': 'Cambodia'},
+    'Phnom Penh': {'lat': 11.56, 'lon': 104.92, 'country': 'Cambodia'},
+    
+    # Vietnam
+    'Hanoi': {'lat': 21.03, 'lon': 105.85, 'country': 'Vietnam'},
+    'Ha Giang': {'lat': 22.80, 'lon': 104.98, 'country': 'Vietnam'},
+    'Cao Bang': {'lat': 22.88, 'lon': 106.25, 'country': 'Vietnam'},
+    'Lang Son': {'lat': 21.86, 'lon': 106.77, 'country': 'Vietnam'},
+    'Da Nang': {'lat': 16.07, 'lon': 108.23, 'country': 'Vietnam'},
+    'Ho Chi Minh': {'lat': 10.78, 'lon': 106.70, 'country': 'Vietnam'},
+}
+
+# Prepare geo data from filtered_df
+geo_df = filtered_df.groupby('district').agg({
     'confirmed_cases': 'sum',
     'deaths': 'sum',
+    'severe_cases': 'sum',
     'border_crossings': 'sum',
-    'migrants_in': 'sum',
-    'severe_cases': 'sum'
+    'is_border_area': 'max'
 }).reset_index()
 
-matrix_df['area_type'] = matrix_df['is_border_area'].map({0: 'Non-Border', 1: 'Border'})
+# Add coordinates
+geo_df['lat'] = geo_df['district'].apply(lambda x: district_coords.get(x, {}).get('lat', None))
+geo_df['lon'] = geo_df['district'].apply(lambda x: district_coords.get(x, {}).get('lon', None))
 
-# Create matrix for confirmed cases
-cases_matrix = matrix_df.pivot_table(
-    index='region', 
-    columns='area_type', 
-    values='confirmed_cases', 
-    fill_value=0
+# Remove rows without coordinates
+geo_df = geo_df.dropna(subset=['lat', 'lon'])
+
+# Add border area label
+geo_df['area_type'] = geo_df['is_border_area'].map({0: 'Non-Border', 1: 'Border'})
+
+# Select metric for map sizing/coloring
+metric_map = st.selectbox(
+    "Select Metric for Geographic Display:",
+    options=['Confirmed Cases', 'Deaths', 'Border Crossings']
 )
 
-# Create matrix for border crossings
-crossings_matrix = matrix_df.pivot_table(
-    index='region', 
-    columns='area_type', 
-    values='border_crossings', 
-    fill_value=0
-)
-
-# Create matrix for deaths
-deaths_matrix = matrix_df.pivot_table(
-    index='region', 
-    columns='area_type', 
-    values='deaths', 
-    fill_value=0
-)
-
-# Select matrix to display
-metric_options = ['Confirmed Cases', 'Border Crossings', 'Deaths']
-selected_metric = st.selectbox("Select Metric for Heatmap:", metric_options)
-
-if selected_metric == 'Confirmed Cases':
-    display_matrix = cases_matrix
-    title = "Cases by Region & Border Area"
-elif selected_metric == 'Border Crossings':
-    display_matrix = crossings_matrix
-    title = "Border Crossings by Region & Area Type"
+if metric_map == 'Confirmed Cases':
+    size_col = 'confirmed_cases'
+    color_col = 'confirmed_cases'
+    title = "Geographic Heatmap: Malaria Cases by District"
+elif metric_map == 'Deaths':
+    size_col = 'deaths'
+    color_col = 'deaths'
+    title = "Geographic Heatmap: Malaria Deaths by District"
 else:
-    display_matrix = deaths_matrix
-    title = "Deaths by Region & Border Area"
+    size_col = 'border_crossings'
+    color_col = 'border_crossings'
+    title = "Geographic Heatmap: Border Crossings by District"
 
-# Create heatmap
-fig4 = go.Figure(data=go.Heatmap(
-    z=display_matrix.values,
-    x=display_matrix.columns.tolist(),
-    y=display_matrix.index.tolist(),
-    colorscale='Reds',
-    text=display_matrix.values,
-    texttemplate='%{text:,}',
-    hovertemplate='Region: %{y}<br>Area: %{x}<br>Value: %{z:,}<extra></extra>'
-))
-
-fig4.update_layout(
-    title=title,
-    xaxis_title="Area Type",
-    yaxis_title="Region",
-    height=max(400, len(display_matrix) * 40),
-    margin=dict(l=150)
+fig4 = px.scatter_mapbox(
+    geo_df,
+    lat='lat',
+    lon='lon',
+    size=size_col,
+    color=color_col,
+    hover_name='district',
+    hover_data={
+        'confirmed_cases': ':,',
+        'deaths': ':,',
+        'border_crossings': ':,',
+        'area_type': True,
+        'lat': ':.2f',
+        'lon': ':.2f'
+    },
+    color_continuous_scale='Reds',
+    size_max=50,
+    zoom=4,
+    center={'lat': 16, 'lon': 101},
+    mapbox_style='open-street-map',
+    title=title
 )
 
+fig4.update_layout(height=600)
 st.plotly_chart(fig4, use_container_width=True)
 
 # ============================================================
