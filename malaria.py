@@ -210,15 +210,12 @@ with col_allocation:
     summary_df['funding_pct'] = (summary_df['priority_score'] / total_score * 100).round(1)
     summary_df = summary_df.sort_values('funding_pct', ascending=False)
     
-    # Clear allocation table
+    # Clear allocation table - simplified for reliability
     alloc_display = summary_df[['country', 'funding_pct']].copy()
     alloc_display.columns = ['Country', 'Allocation %']
     
     st.dataframe(
-        alloc_display.style.format({'Allocation %': '{:.1f}%'}).background_gradient(
-            subset=['Allocation %'],
-            cmap='Reds'
-        ),
+        alloc_display.style.format({'Allocation %': '{:.1f}%'}),
         use_container_width=True,
         hide_index=True,
         height=180
