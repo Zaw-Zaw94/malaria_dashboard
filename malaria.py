@@ -156,7 +156,7 @@ st.markdown(f'<div class="urgent-box"><p class="urgent-title">⚠️ FUNDING REC
 # ============================================================
 # EXECUTIVE METRICS - EPIDEMIOLOGICAL FOCUS
 # ============================================================
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.markdown(f'<div class="stat-box"><div class="stat-number">{int(total_cases):,}</div><div class="stat-label">TOTAL CASES</div></div>', unsafe_allow_html=True)
 with col2:
@@ -167,8 +167,6 @@ with col3:
 with col4:
     overall_rate = (total_cases / priority_df['population'].sum() * 1000)
     st.markdown(f'<div class="stat-box"><div class="stat-number">{overall_rate:.1f}</div><div class="stat-label">CASES/1K PEOPLE</div></div>', unsafe_allow_html=True)
-with col5:
-    st.markdown(f'<div class="stat-box"><div class="stat-number">{top_country["priority_score"]:.0f}/100</div><div class="stat-label">PRIORITY SCORE</div></div>', unsafe_allow_html=True)
 
 # ============================================================
 # TOP PRIORITY COUNTRY SPOTLIGHT
@@ -179,45 +177,30 @@ col_spotlight, col_allocation = st.columns([1.3, 0.7])
 
 with col_spotlight:
     st.markdown(f"### 🔴 WHERE YOUR FUNDING MATTERS MOST: {top_country_name}")
-    st.markdown(f"**Why This Country**: {int(top_country['deaths']):,} deaths/year | {top_country['cfr']:.1f}% die from malaria (highest risk) | Population needs: {top_country['case_rate']:.1f}/1K")
     
-    priority1_cases = int(top_country['confirmed_cases'])
-    priority1_deaths = int(top_country['deaths'])
-    priority1_cfr = top_country['cfr']
-    priority1_rate = top_country['case_rate']
-    
-    # Large visual for priority score
-    fig_priority_top = px.bar(
-        priority_df.head(1),
-        x='country',
-        y='priority_score',
+    # Priority score comparison across all countries
+    fig_priority_comparison = px.bar(
+        priority_df.sort_values('priority_score', ascending=True),
+        y='country',
+        x='priority_score',
+        orientation='h',
         text='priority_score',
-        color_discrete_sequence=['#ff4757'],
-        title='',
-        labels={'priority_score': 'Priority Score', 'country': ''}
+        color='priority_score',
+        color_continuous_scale=['#95a5a6', '#ff9f43', '#ff6348', '#ff4757'],
+        title='Priority Score Across CLMV Countries',
+        labels={'priority_score': 'Priority Score', 'country': 'Country'}
     )
-    fig_priority_top.update_traces(texttemplate='PRIORITY RANK: %{text:.0f}', textposition='outside', textfont=dict(size=16, color='#ff4757', family='Arial Black'))
-    fig_priority_top.update_layout(
-        height=120, 
-        showlegend=False, 
-        xaxis=dict(showticklabels=False),
-        yaxis_visible=False,
-        plot_bgcolor='rgba(0,0,0,0)',
+    fig_priority_comparison.update_traces(texttemplate='%{text:.1f}', textposition='outside', textfont=dict(size=14, color='#1a1a1a'))
+    fig_priority_comparison.update_layout(
+        height=280,
+        showlegend=False,
+        xaxis_title='Priority Score',
+        yaxis_title='',
+        plot_bgcolor='rgba(240,240,240,0.3)',
         paper_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=0, r=0, t=0, b=0)
+        margin=dict(l=100, r=50, t=40, b=40)
     )
-    st.plotly_chart(fig_priority_top, use_container_width=True)
-    
-    # Key impact metrics
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        st.metric("Annual Cases", f"{priority1_cases:,}")
-    with m2:
-        st.metric("Deaths/Year", f"{priority1_deaths:,}")
-    with m3:
-        st.metric("Mortality Risk", f"{priority1_cfr:.1f}%")
-    with m4:
-        st.metric("Affected Population", f"{priority1_rate:.1f}/1K")
+    st.plotly_chart(fig_priority_comparison, use_container_width=True)
 
 with col_allocation:
     st.markdown("### 💰 RECOMMENDED ALLOCATION")
