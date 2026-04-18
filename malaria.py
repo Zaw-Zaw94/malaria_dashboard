@@ -121,7 +121,7 @@ fig_clmv = px.bar(
     clmv_df,
     x='country',
     y='confirmed_cases',
-    text=['confirmed_cases'],
+    text='confirmed_cases',
     color='deaths',
     color_continuous_scale="Reds",
     labels={'confirmed_cases': 'Total Cases', 'country': 'Country', 'deaths': 'Deaths'},
