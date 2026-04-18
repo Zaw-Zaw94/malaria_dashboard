@@ -35,54 +35,63 @@ df = load_data()
 # Sidebar filters
 st.sidebar.header("Filters")
 
-# Country filter - PRIMARY (default: all countries)
-all_countries = sorted(df['country'].dropna().unique())
-selected_countries = st.sidebar.multiselect(
-    "Select Countries",
-    options=all_countries,
-    default=all_countries
+# Country filter - PRIMARY (dropdown)
+all_countries = ['All'] + sorted(df['country'].dropna().unique().tolist())
+selected_country = st.sidebar.selectbox(
+    "Select Country",
+    options=all_countries
 )
 
-# Year filter (default: all years)
-all_years = sorted(df['year'].unique())
-selected_years = st.sidebar.multiselect(
-    "Select Years",
-    options=all_years,
-    default=all_years
+# Year filter (dropdown)
+all_years = ['All'] + sorted([int(y) for y in df['year'].unique()])
+selected_year = st.sidebar.selectbox(
+    "Select Year",
+    options=all_years
 )
 
-# Region filter
-all_regions = sorted(df['region'].dropna().unique())
-selected_regions = st.sidebar.multiselect(
-    "Select Regions",
-    options=all_regions,
-    default=all_regions
+# Region filter (dropdown)
+all_regions = ['All'] + sorted(df['region'].dropna().unique().tolist())
+selected_region = st.sidebar.selectbox(
+    "Select Region",
+    options=all_regions
 )
 
-# District filter
-all_districts = sorted(df['district'].dropna().unique())
-selected_districts = st.sidebar.multiselect(
-    "Select Districts",
-    options=all_districts,
-    default=all_districts
+# District filter (dropdown)
+all_districts = ['All'] + sorted(df['district'].dropna().unique().tolist())
+selected_district = st.sidebar.selectbox(
+    "Select District",
+    options=all_districts
 )
 
-# Endemic level filter
-all_endemic = sorted(df['endemic_level'].dropna().unique())
-selected_endemic = st.sidebar.multiselect(
+# Endemic level filter (dropdown)
+all_endemic = ['All'] + sorted(df['endemic_level'].dropna().unique().tolist())
+selected_endemic = st.sidebar.selectbox(
     "Endemic Level",
-    options=all_endemic,
-    default=all_endemic
+    options=all_endemic
 )
 
-# Filter data
-filtered_df = df[
-    (df['country'].isin(selected_countries)) &
-    (df['year'].isin(selected_years)) &
-    (df['region'].isin(selected_regions)) &
-    (df['district'].isin(selected_districts)) &
-    (df['endemic_level'].isin(selected_endemic))
-]
+# Filter data (handle "All" selections)
+def filter_data():
+    mask = pd.Series([True] * len(df))
+    
+    if selected_country != 'All':
+        mask &= (df['country'] == selected_country)
+    
+    if selected_year != 'All':
+        mask &= (df['year'] == selected_year)
+    
+    if selected_region != 'All':
+        mask &= (df['region'] == selected_region)
+    
+    if selected_district != 'All':
+        mask &= (df['district'] == selected_district)
+    
+    if selected_endemic != 'All':
+        mask &= (df['endemic_level'] == selected_endemic)
+    
+    return df[mask]
+
+filtered_df = filter_data()
 
 # Main title
 st.title("🦟 Malaria Burden Dashboard")
@@ -100,11 +109,11 @@ total_pv = filtered_df['pv_cases'].sum()
 total_severe = filtered_df['severe_cases'].sum()
 
 # Calculate trend (compare first and last year)
-first_year = min(selected_years) if selected_years else df['year'].min()
-last_year = max(selected_years) if selected_years else df['year'].max()
+first_year = int(min(df['year'].unique())) if selected_year == 'All' else selected_year
+last_year = int(max(df['year'].unique())) if selected_year == 'All' else selected_year
 
-cases_first = df[(df['year'] == first_year) & (df['country'].isin(selected_countries))]['confirmed_cases'].sum()
-cases_last = df[(df['year'] == last_year) & (df['country'].isin(selected_countries))]['confirmed_cases'].sum()
+cases_first = df[(df['year'] == first_year)]['confirmed_cases'].sum()
+cases_last = df[(df['year'] == last_year)]['confirmed_cases'].sum()
 reduction = ((cases_first - cases_last) / cases_first * 100) if cases_first > 0 else 0
 
 col1.metric("Total Cases", f"{total_cases:,.0f}")
@@ -167,18 +176,27 @@ agg_df = filtered_df.groupby(['year', 'month']).agg({
 agg_df['period'] = agg_df['year'].astype(str) + '-' + agg_df['month'].astype(str).str.zfill(2)
 agg_df = agg_df.sort_values(['year', 'month'])
 
+# Show only year on x-axis to avoid crowding
+agg_df['year_label'] = agg_df['year'].astype(str)
+
 fig1 = go.Figure()
-fig1.add_trace(go.Scatter(x=agg_df['period'], y=agg_df['confirmed_cases'], name="Confirmed", line=dict(color='#1f77b4')))
-fig1.add_trace(go.Scatter(x=agg_df['period'], y=agg_df['pf_cases'], name="P. falciparum", line=dict(color='#d62728')))
-fig1.add_trace(go.Scatter(x=agg_df['period'], y=agg_df['pv_cases'], name="P. vivax", line=dict(color='#2ca02c')))
-fig1.add_trace(go.Scatter(x=agg_df['period'], y=agg_df['deaths'], name="Deaths", line=dict(color='#ff7f0e')))
+fig1.add_trace(go.Scatter(x=agg_df['period'], y=agg_df['confirmed_cases'], 
+                          name="Confirmed", line=dict(color='#1f77b4'), hovertemplate='%{x}<br>Cases: %{y:,}<extra></extra>'))
+fig1.add_trace(go.Scatter(x=agg_df['period'], y=agg_df['pf_cases'], 
+                          name="P. falciparum", line=dict(color='#d62728'), hovertemplate='%{x}<br>Cases: %{y:,}<extra></extra>'))
+fig1.add_trace(go.Scatter(x=agg_df['period'], y=agg_df['pv_cases'], 
+                          name="P. vivax", line=dict(color='#2ca02c'), hovertemplate='%{x}<br>Cases: %{y:,}<extra></extra>'))
+fig1.add_trace(go.Scatter(x=agg_df['period'], y=agg_df['deaths'], 
+                          name="Deaths", line=dict(color='#ff7f0e', width=3), hovertemplate='%{x}<br>Deaths: %{y:,}<extra></extra>'))
 
 fig1.update_layout(
     xaxis_title="Period",
     yaxis_title="Cases",
     legend_title="Metric",
     hovermode="x unified",
-    height=400
+    height=400,
+    xaxis=dict(tickangle=-45),
+    showlegend=True
 )
 
 st.plotly_chart(fig1, use_container_width=True)
@@ -260,34 +278,78 @@ fig_district.update_layout(height=400)
 st.plotly_chart(fig_district, use_container_width=True)
 
 # ============================================================
-# Border Area Analysis
+# Border Area Analysis (Matrix Heatmap)
 # ============================================================
-st.subheader("🚧 Border Area Analysis")
+st.subheader("🚧 Border Area Analysis (Matrix Heatmap)")
 
-border_df = filtered_df.groupby(['region', 'is_border_area']).agg({
+# Create pivot table: Region x Border Area Type
+matrix_df = filtered_df.groupby(['region', 'is_border_area']).agg({
     'confirmed_cases': 'sum',
+    'deaths': 'sum',
     'border_crossings': 'sum',
     'migrants_in': 'sum',
-    'migrants_out': 'sum'
+    'severe_cases': 'sum'
 }).reset_index()
 
-border_df['area_type'] = border_df['is_border_area'].map({0: 'Non-Border', 1: 'Border'})
+matrix_df['area_type'] = matrix_df['is_border_area'].map({0: 'Non-Border', 1: 'Border'})
 
-fig4 = px.scatter(
-    border_df,
-    x='border_crossings',
-    y='confirmed_cases',
-    size='migrants_in',
-    color='area_type',
-    hover_data=['region'],
-    labels={
-        'border_crossings': 'Border Crossings',
-        'confirmed_cases': 'Confirmed Cases',
-        'migrants_in': 'Migrants In',
-        'area_type': 'Area Type'
-    }
+# Create matrix for confirmed cases
+cases_matrix = matrix_df.pivot_table(
+    index='region', 
+    columns='area_type', 
+    values='confirmed_cases', 
+    fill_value=0
 )
-fig4.update_layout(height=400)
+
+# Create matrix for border crossings
+crossings_matrix = matrix_df.pivot_table(
+    index='region', 
+    columns='area_type', 
+    values='border_crossings', 
+    fill_value=0
+)
+
+# Create matrix for deaths
+deaths_matrix = matrix_df.pivot_table(
+    index='region', 
+    columns='area_type', 
+    values='deaths', 
+    fill_value=0
+)
+
+# Select matrix to display
+metric_options = ['Confirmed Cases', 'Border Crossings', 'Deaths']
+selected_metric = st.selectbox("Select Metric for Heatmap:", metric_options)
+
+if selected_metric == 'Confirmed Cases':
+    display_matrix = cases_matrix
+    title = "Cases by Region & Border Area"
+elif selected_metric == 'Border Crossings':
+    display_matrix = crossings_matrix
+    title = "Border Crossings by Region & Area Type"
+else:
+    display_matrix = deaths_matrix
+    title = "Deaths by Region & Border Area"
+
+# Create heatmap
+fig4 = go.Figure(data=go.Heatmap(
+    z=display_matrix.values,
+    x=display_matrix.columns.tolist(),
+    y=display_matrix.index.tolist(),
+    colorscale='Reds',
+    text=display_matrix.values,
+    texttemplate='%{text:,}',
+    hovertemplate='Region: %{y}<br>Area: %{x}<br>Value: %{z:,}<extra></extra>'
+))
+
+fig4.update_layout(
+    title=title,
+    xaxis_title="Area Type",
+    yaxis_title="Region",
+    height=max(400, len(display_matrix) * 40),
+    margin=dict(l=150)
+)
+
 st.plotly_chart(fig4, use_container_width=True)
 
 # ============================================================
