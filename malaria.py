@@ -125,10 +125,10 @@ priority_df = df[df['country'].isin(clmv_countries)].groupby('country').agg({
 priority_df['case_rate'] = (priority_df['confirmed_cases'] / priority_df['population'] * 1000).round(2)
 priority_df['cfr'] = (priority_df['deaths'] / priority_df['confirmed_cases'] * 100).round(2)
 
+# Calculate priority score (weighted) - Deaths heavily weighted
 priority_df['priority_score'] = (
-    (priority_df['confirmed_cases'] / priority_df['confirmed_cases'].max() * 35) +
-    (priority_df['deaths'] / priority_df['deaths'].max() * 35) +
-    (priority_df['case_rate'] / priority_df['case_rate'].max() * 30)
+    (priority_df['confirmed_cases'] / priority_df['confirmed_cases'].max() * 30) +
+    (priority_df['deaths'] / priority_df['deaths'].max() * 70)
 ).round(1)
 
 priority_df = priority_df.sort_values('priority_score', ascending=False).reset_index(drop=True)
@@ -210,20 +210,22 @@ with col_allocation:
     summary_df['funding_pct'] = (summary_df['priority_score'] / total_score * 100).round(1)
     summary_df = summary_df.sort_values('funding_pct', ascending=False)
     
-    top_funding = summary_df.iloc[0]['funding_pct']
+    # Clear allocation table
+    alloc_display = summary_df[['country', 'funding_pct']].copy()
+    alloc_display.columns = ['Country', 'Allocation %']
     
-    fig_alloc = px.pie(
-        summary_df,
-        values='funding_pct',
-        names='country',
-        title='Fund Distribution %',
-        color_discrete_sequence=['#ff4757', '#ff9f43', '#ffd93d', '#95e1d3']
+    st.dataframe(
+        alloc_display.style.format({'Allocation %': '{:.1f}%'}).background_gradient(
+            subset=['Allocation %'],
+            cmap='Reds'
+        ),
+        use_container_width=True,
+        hide_index=True,
+        height=180
     )
-    fig_alloc.update_layout(height=220, font=dict(size=11))
-    fig_alloc.update_traces(textposition='inside', textinfo='label+percent')
-    st.plotly_chart(fig_alloc, use_container_width=True)
     
-    st.markdown(f'<div class="recommendation-box">Myanmar: {top_funding:.0f}%</div>', unsafe_allow_html=True)
+    top_funding = summary_df.iloc[0]['funding_pct']
+    st.markdown(f'<div class="recommendation-box">👉 Myanmar: {top_funding:.1f}%<br/>Priority: Highest</div>', unsafe_allow_html=True)
 
 # ============================================================
 # COUNTRY RANKINGS (SIMPLE TABLE)
@@ -273,4 +275,4 @@ with col_info:
     st.info("📉 **Declining** - Programs working BUT Myanmar still needs support to maintain progress")
 
 st.markdown("---")
-st.markdown("📝 **Methodology**: Priority Score = Case Volume (35%) + Deaths (35%) + Case Rate (30%) | Data: Synthetic Surveillance System")
+st.markdown("📝 **Methodology**: Priority Score = Case Volume (30%) + Deaths (70%) | **Deaths weighted heavily to reflect severity** | Data: Synthetic Surveillance System")
