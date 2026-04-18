@@ -97,49 +97,9 @@ col4.metric("🗺️ Countries Affected", f"{affected_countries}")
 st.markdown("---")
 
 # ============================================================
-# PRIORITY SCORING METHODOLOGY (TRANSPARENCY FIRST)
+# FUNDING PRIORITY RANKING
 # ============================================================
-st.subheader("🔍 How We Calculate Priority Score (Full Transparency)")
-
-methodology_col1, methodology_col2, methodology_col3 = st.columns(3)
-
-with methodology_col1:
-    st.markdown("""
-    **📊 Case Volume (35%)**
-    
-    Reflects absolute disease burden.
-    - Countries with more cases = higher weight
-    - Normalized by highest case count
-    - Formula: (Cases / Max Cases) × 35
-    """)
-
-with methodology_col2:
-    st.markdown("""
-    **☠️ Deaths (35%)**
-    
-    Reflects severity & mortality impact.
-    - Deaths are highest priority
-    - Directly measure program urgency
-    - Formula: (Deaths / Max Deaths) × 35
-    """)
-
-with methodology_col3:
-    st.markdown("""
-    **📈 Case Rate (30%)**
-    
-    Reflects population-level impact.
-    - Cases per 1000 population
-    - Controls for country size
-    - Formula: (Rate / Max Rate) × 30
-    """)
-
-st.info("**Final Score = Case Volume + Deaths + Case Rate** (Range: 0-100) | **Higher score = Needs more funding**")
-st.markdown("---")
-
-# ============================================================
-# FUNDING PRIORITY RANKING & COMPARISON (SIDE-BY-SIDE)
-# ============================================================
-st.subheader("🎯 FUNDING PRIORITY RANKING vs Detailed Comparison")
+st.subheader("🎯 FUNDING PRIORITY RANKING")
 
 clmv_countries = ['Cambodia', 'Laos', 'Myanmar', 'Vietnam']
 priority_df = df[df['country'].isin(clmv_countries)].groupby('country').agg({
@@ -164,39 +124,21 @@ priority_df['priority_score'] = (
 priority_df = priority_df.sort_values('priority_score', ascending=False).reset_index(drop=True)
 priority_df['rank'] = range(1, len(priority_df) + 1)
 
-# Side-by-side layout: Chart on left, Table on right
-col_chart, col_table = st.columns([1.2, 1])
-
-# LEFT: Visualization: Priority Ranking Bar Chart
-with col_chart:
-    fig_priority = px.bar(
-        priority_df,
-        x='country',
-        y='priority_score',
-        text='priority_score',
-        color='priority_score',
-        color_continuous_scale=['#51cf66', '#ffa94d', '#ff6b6b'],
-        labels={'priority_score': 'Priority Score', 'country': 'Country'},
-        hover_data={'priority_score': ':.1f', 'confirmed_cases': ',.0f', 'deaths': ',.0f'},
-        title="Priority Ranking by Score"
-    )
-    fig_priority.update_layout(height=450, showlegend=False, xaxis_tickangle=-45)
-    st.plotly_chart(fig_priority, use_container_width=True)
-
-# RIGHT: Detailed Comparison Table
-with col_table:
-    st.markdown("**Detailed Metrics by Country**")
-    comparison_table = priority_df[['rank', 'country', 'confirmed_cases', 'deaths', 'case_rate', 'cfr', 'priority_score']].copy()
-    comparison_table.columns = ['Rank', 'Country', 'Cases', 'Deaths', 'Rate/1K', 'CFR%', 'Score']
-    comparison_table['Cases'] = comparison_table['Cases'].apply(lambda x: f"{int(x):,}")
-    comparison_table['Deaths'] = comparison_table['Deaths'].apply(lambda x: f"{int(x):,}")
-    
-    st.dataframe(
-        comparison_table.style.format({'Rate/1K': '{:.1f}', 'CFR%': '{:.2f}', 'Score': '{:.1f}'}),
-        use_container_width=True,
-        hide_index=True,
-        height=450
-    )
+# Visualization: Priority Ranking Bar Chart (full width)
+fig_priority = px.bar(
+    priority_df,
+    x='country',
+    y='priority_score',
+    text='priority_score',
+    color='priority_score',
+    color_continuous_scale=['#51cf66', '#ffa94d', '#ff6b6b'],
+    labels={'priority_score': 'Priority Score', 'country': 'Country'},
+    hover_data={'priority_score': ':.1f', 'confirmed_cases': ',.0f', 'deaths': ',.0f'},
+    title="Priority Ranking by Score"
+)
+fig_priority.update_traces(texttemplate='%{text:.1f}', textposition='auto')
+fig_priority.update_layout(height=400, showlegend=False, xaxis_tickangle=-45)
+st.plotly_chart(fig_priority, use_container_width=True)
 
 st.markdown("---")
 
@@ -290,21 +232,21 @@ fig_ts.update_layout(
     xaxis_title="Period",
     yaxis=dict(
         title="Cases",
-        titlefont=dict(color='#1f77b4'),
-        tickfont=dict(color='#1f77b4'),
-        side='left'
+        title_font=dict(color='#1f77b4'),
+        tickfont=dict(color='#1f77b4')
     ),
     yaxis2=dict(
         title="Deaths",
-        titlefont=dict(color='#d62728'),
+        title_font=dict(color='#d62728'),
         tickfont=dict(color='#d62728'),
-        side='right',
-        overlaying='y'
+        overlaying='y',
+        side='right'
     ),
     hovermode='x unified',
     height=350,
     xaxis=dict(tickangle=-45),
-    legend=dict(x=0.01, y=0.99)
+    legend=dict(x=0.01, y=0.99),
+    plot_bgcolor='rgba(240,240,240,0.5)'
 )
 
 st.plotly_chart(fig_ts, use_container_width=True)
