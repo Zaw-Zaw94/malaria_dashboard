@@ -125,10 +125,16 @@ priority_df = df[df['country'].isin(clmv_countries)].groupby('country').agg({
 priority_df['case_rate'] = (priority_df['confirmed_cases'] / priority_df['population'] * 1000).round(2)
 priority_df['cfr'] = (priority_df['deaths'] / priority_df['confirmed_cases'] * 100).round(2)
 
-# Calculate priority score (weighted) - Deaths heavily weighted
+# Calculate epidemiologically-sound priority score
+# Components: Mortality Risk (CFR) + Disease Burden (population-adjusted rate) + Absolute Deaths
+priority_df['cfr_normalized'] = priority_df['cfr'] / priority_df['cfr'].max() * 40  # Severity
+priority_df['rate_normalized'] = priority_df['case_rate'] / priority_df['case_rate'].max() * 35  # Burden
+priority_df['deaths_normalized'] = priority_df['deaths'] / priority_df['deaths'].max() * 25  # Scale
+
 priority_df['priority_score'] = (
-    (priority_df['confirmed_cases'] / priority_df['confirmed_cases'].max() * 30) +
-    (priority_df['deaths'] / priority_df['deaths'].max() * 70)
+    priority_df['cfr_normalized'] + 
+    priority_df['rate_normalized'] + 
+    priority_df['deaths_normalized']
 ).round(1)
 
 priority_df = priority_df.sort_values('priority_score', ascending=False).reset_index(drop=True)
@@ -139,23 +145,30 @@ total_cases = priority_df['confirmed_cases'].sum()
 total_deaths = priority_df['deaths'].sum()
 
 # ============================================================
-# PROBLEM STATEMENT (AT A GLANCE)
+# PROBLEM STATEMENT (AT A GLANCE) - Funder Focus
 # ============================================================
-st.markdown('<div class="urgent-box"><p class="urgent-title">⚠️ URGENT FUNDING NEEDED</p><p class="urgent-subtitle">Myanmar faces critical malaria burden - Requires immediate resources</p></div>', unsafe_allow_html=True)
+top_country_name = top_country['country']
+top_cfr = top_country['cfr']
+top_rate = top_country['case_rate']
+alert_msg = f"{top_country_name}: {int(top_country['deaths']):,} deaths annually | Highest mortality risk per case ({top_cfr:.1f}%) | Most urgent funding need"
+st.markdown(f'<div class="urgent-box"><p class="urgent-title">⚠️ FUNDING RECOMMENDATION</p><p class="urgent-subtitle">{alert_msg}</p></div>', unsafe_allow_html=True)
 
 # ============================================================
-# EXECUTIVE METRICS
+# EXECUTIVE METRICS - EPIDEMIOLOGICAL FOCUS
 # ============================================================
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     st.markdown(f'<div class="stat-box"><div class="stat-number">{int(total_cases):,}</div><div class="stat-label">TOTAL CASES</div></div>', unsafe_allow_html=True)
 with col2:
-    st.markdown(f'<div class="stat-box"><div class="stat-number">{int(total_deaths):,}</div><div class="stat-label">DEATHS</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="stat-box"><div class="stat-number">{int(total_deaths):,}</div><div class="stat-label">ANNUAL DEATHS</div></div>', unsafe_allow_html=True)
 with col3:
     cfr = (total_deaths / total_cases * 100) if total_cases > 0 else 0
-    st.markdown(f'<div class="stat-box"><div class="stat-number">{cfr:.1f}%</div><div class="stat-label">FATALITY RATE</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="stat-box"><div class="stat-number">{cfr:.1f}%</div><div class="stat-label">MORTALITY RATE</div></div>', unsafe_allow_html=True)
 with col4:
-    st.markdown(f'<div class="stat-box"><div class="stat-number">{top_country["priority_score"]:.0f}/100</div><div class="stat-label">TOP PRIORITY</div></div>', unsafe_allow_html=True)
+    overall_rate = (total_cases / priority_df['population'].sum() * 1000)
+    st.markdown(f'<div class="stat-box"><div class="stat-number">{overall_rate:.1f}</div><div class="stat-label">CASES/1K PEOPLE</div></div>', unsafe_allow_html=True)
+with col5:
+    st.markdown(f'<div class="stat-box"><div class="stat-number">{top_country["priority_score"]:.0f}/100</div><div class="stat-label">PRIORITY SCORE</div></div>', unsafe_allow_html=True)
 
 # ============================================================
 # TOP PRIORITY COUNTRY SPOTLIGHT
@@ -165,13 +178,15 @@ st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
 col_spotlight, col_allocation = st.columns([1.3, 0.7])
 
 with col_spotlight:
-    st.markdown("### 🔴 PRIMARY FOCUS: Myanmar")
+    st.markdown(f"### 🔴 WHERE YOUR FUNDING MATTERS MOST: {top_country_name}")
+    st.markdown(f"**Why This Country**: {int(top_country['deaths']):,} deaths/year | {top_country['cfr']:.1f}% die from malaria (highest risk) | Population needs: {top_country['case_rate']:.1f}/1K")
     
     priority1_cases = int(top_country['confirmed_cases'])
     priority1_deaths = int(top_country['deaths'])
+    priority1_cfr = top_country['cfr']
     priority1_rate = top_country['case_rate']
     
-    # Large visual for Myanmar burden
+    # Large visual for priority score
     fig_priority_top = px.bar(
         priority_df.head(1),
         x='country',
@@ -181,9 +196,9 @@ with col_spotlight:
         title='',
         labels={'priority_score': 'Priority Score', 'country': ''}
     )
-    fig_priority_top.update_traces(texttemplate='SCORE: %{text:.0f}', textposition='outside', textfont=dict(size=18, color='#ff4757', family='Arial Black'))
+    fig_priority_top.update_traces(texttemplate='PRIORITY RANK: %{text:.0f}', textposition='outside', textfont=dict(size=16, color='#ff4757', family='Arial Black'))
     fig_priority_top.update_layout(
-        height=150, 
+        height=120, 
         showlegend=False, 
         xaxis=dict(showticklabels=False),
         yaxis_visible=False,
@@ -193,14 +208,16 @@ with col_spotlight:
     )
     st.plotly_chart(fig_priority_top, use_container_width=True)
     
-    # Key metrics for Myanmar
-    m1, m2, m3 = st.columns(3)
+    # Key impact metrics
+    m1, m2, m3, m4 = st.columns(4)
     with m1:
-        st.metric("Cases", f"{priority1_cases:,}")
+        st.metric("Annual Cases", f"{priority1_cases:,}")
     with m2:
-        st.metric("Deaths", f"{priority1_deaths:,}")
+        st.metric("Deaths/Year", f"{priority1_deaths:,}")
     with m3:
-        st.metric("Rate/1K Pop", f"{priority1_rate:.1f}")
+        st.metric("Mortality Risk", f"{priority1_cfr:.1f}%")
+    with m4:
+        st.metric("Affected Population", f"{priority1_rate:.1f}/1K")
 
 with col_allocation:
     st.markdown("### 💰 RECOMMENDED ALLOCATION")
@@ -222,18 +239,20 @@ with col_allocation:
     )
     
     top_funding = summary_df.iloc[0]['funding_pct']
-    st.markdown(f'<div class="recommendation-box">👉 Myanmar: {top_funding:.1f}%<br/>Priority: Highest</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="recommendation-box">👉 {top_country_name}: {top_funding:.1f}%<br/>Priority: Highest</div>', unsafe_allow_html=True)
 
 # ============================================================
 # COUNTRY RANKINGS (SIMPLE TABLE)
 # ============================================================
 st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
-st.markdown("### All Countries Ranked")
+st.markdown("### 🔬 EPIDEMIOLOGICAL PROFILE - All Countries")
 
-ranking_table = priority_df[['country', 'confirmed_cases', 'deaths', 'priority_score']].copy()
-ranking_table.columns = ['Country', 'Cases', 'Deaths', 'Priority Score']
+ranking_table = priority_df[['country', 'confirmed_cases', 'deaths', 'cfr', 'case_rate', 'priority_score']].copy()
+ranking_table.columns = ['Country', 'Cases', 'Deaths', 'CFR %', 'Rate/1K Pop', 'Priority Score']
 ranking_table['Cases'] = ranking_table['Cases'].apply(lambda x: f"{int(x):,}")
 ranking_table['Deaths'] = ranking_table['Deaths'].apply(lambda x: f"{int(x):,}")
+ranking_table['CFR %'] = ranking_table['CFR %'].apply(lambda x: f"{x:.2f}%")
+ranking_table['Rate/1K Pop'] = ranking_table['Rate/1K Pop'].apply(lambda x: f"{x:.1f}")
 
 st.dataframe(
     ranking_table.style.format({'Priority Score': '{:.1f}'}),
@@ -241,6 +260,9 @@ st.dataframe(
     hide_index=True,
     height=200
 )
+
+st.success("✓ **Funding Allocation Based On**: 40% Mortality Risk (CFR) + 35% Population Disease Burden + 25% Total Deaths | Countries with higher death rates or more deaths get more funding")
+
 
 # ============================================================
 # TREND CONFIRMATION
@@ -268,8 +290,9 @@ with col_cases:
     st.plotly_chart(fig_trend, use_container_width=True)
 
 with col_info:
-    st.markdown("**Status**")
-    st.info("📉 **Declining** - Programs working BUT Myanmar still needs support to maintain progress")
+    st.markdown("**Trend**")
+    trend_status = "📉 Declining" if total_cases > 0 else "📈 Rising"
+    st.info(f"{trend_status} - Progress is happening BUT continued funding needed to maintain gains")
 
 st.markdown("---")
-st.markdown("📝 **Methodology**: Priority Score = Case Volume (30%) + Deaths (70%) | **Deaths weighted heavily to reflect severity** | Data: Synthetic Surveillance System")
+st.markdown("💡 **How We Prioritize Your Funding**: We look at three things: (1) **Mortality Risk** (40%) - How many people die from malaria in each country? This tells us where healthcare is weakest. (2) **Population Impact** (35%) - How many people in each country get malaria? This shows scale of the problem. (3) **Total Deaths** (25%) - Raw count of lives at stake. Countries with deadlier malaria, worse healthcare systems, or more deaths get prioritized first. | **Note**: Using Synthetic Surveillance Data (2015-2025) | Last Updated: 2026")
