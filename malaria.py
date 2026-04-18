@@ -379,18 +379,21 @@ district_df = filtered_df.groupby('district').agg({
 district_df['case_rate'] = (district_df['confirmed_cases'] / district_df['population'] * 1000).round(2)
 district_df = district_df.sort_values('confirmed_cases', ascending=False).head(15)
 
-fig_district = px.bar(
-    district_df,
-    x='district',
-    y='confirmed_cases',
-    text='confirmed_cases',
-    color='deaths',
-    color_continuous_scale="Reds",
-    labels={'confirmed_cases': 'Confirmed Cases', 'district': 'District', 'deaths': 'Deaths'},
-    hover_data=['case_rate', 'border_crossings']
-)
-fig_district.update_layout(height=400)
-st.plotly_chart(fig_district, use_container_width=True)
+if len(district_df) > 0:
+    fig_district = px.bar(
+        district_df,
+        x='district',
+        y='confirmed_cases',
+        text='confirmed_cases',
+        color='deaths',
+        color_continuous_scale="Reds",
+        labels={'confirmed_cases': 'Confirmed Cases', 'district': 'District', 'deaths': 'Deaths'},
+        hover_data=['case_rate', 'border_crossings']
+    )
+    fig_district.update_layout(height=400)
+    st.plotly_chart(fig_district, use_container_width=True)
+else:
+    st.info("No district data available for selected filters.")
 
 # ============================================================
 # Border Area Analysis (Geographic Heatmap)
@@ -450,53 +453,56 @@ geo_df['lon'] = geo_df['district'].apply(lambda x: district_coords.get(x, {}).ge
 # Remove rows without coordinates
 geo_df = geo_df.dropna(subset=['lat', 'lon'])
 
-# Add border area label
-geo_df['area_type'] = geo_df['is_border_area'].map({0: 'Non-Border', 1: 'Border'})
-
-# Select metric for map sizing/coloring
-metric_map = st.selectbox(
-    "Select Metric for Geographic Display:",
-    options=['Confirmed Cases', 'Deaths', 'Border Crossings']
-)
-
-if metric_map == 'Confirmed Cases':
-    size_col = 'confirmed_cases'
-    color_col = 'confirmed_cases'
-    title = "Geographic Heatmap: Malaria Cases by District"
-elif metric_map == 'Deaths':
-    size_col = 'deaths'
-    color_col = 'deaths'
-    title = "Geographic Heatmap: Malaria Deaths by District"
+if len(geo_df) > 0:
+    # Add border area label
+    geo_df['area_type'] = geo_df['is_border_area'].map({0: 'Non-Border', 1: 'Border'})
+    
+    # Select metric for map sizing/coloring
+    metric_map = st.selectbox(
+        "Select Metric for Geographic Display:",
+        options=['Confirmed Cases', 'Deaths', 'Border Crossings']
+    )
+    
+    if metric_map == 'Confirmed Cases':
+        size_col = 'confirmed_cases'
+        color_col = 'confirmed_cases'
+        title = "Geographic Heatmap: Malaria Cases by District"
+    elif metric_map == 'Deaths':
+        size_col = 'deaths'
+        color_col = 'deaths'
+        title = "Geographic Heatmap: Malaria Deaths by District"
+    else:
+        size_col = 'border_crossings'
+        color_col = 'border_crossings'
+        title = "Geographic Heatmap: Border Crossings by District"
+    
+    fig4 = px.scatter_mapbox(
+        geo_df,
+        lat='lat',
+        lon='lon',
+        size=size_col,
+        color=color_col,
+        hover_name='district',
+        hover_data={
+            'confirmed_cases': ':,',
+            'deaths': ':,',
+            'border_crossings': ':,',
+            'area_type': True,
+            'lat': ':.2f',
+            'lon': ':.2f'
+        },
+        color_continuous_scale='Reds',
+        size_max=50,
+        zoom=4,
+        center={'lat': 16, 'lon': 101},
+        mapbox_style='open-street-map',
+        title=title
+    )
+    
+    fig4.update_layout(height=600)
+    st.plotly_chart(fig4, use_container_width=True)
 else:
-    size_col = 'border_crossings'
-    color_col = 'border_crossings'
-    title = "Geographic Heatmap: Border Crossings by District"
-
-fig4 = px.scatter_mapbox(
-    geo_df,
-    lat='lat',
-    lon='lon',
-    size=size_col,
-    color=color_col,
-    hover_name='district',
-    hover_data={
-        'confirmed_cases': ':,',
-        'deaths': ':,',
-        'border_crossings': ':,',
-        'area_type': True,
-        'lat': ':.2f',
-        'lon': ':.2f'
-    },
-    color_continuous_scale='Reds',
-    size_max=50,
-    zoom=4,
-    center={'lat': 16, 'lon': 101},
-    mapbox_style='open-street-map',
-    title=title
-)
-
-fig4.update_layout(height=600)
-st.plotly_chart(fig4, use_container_width=True)
+    st.warning("No geographic data available for selected filters.")
 
 # ============================================================
 # Resource Allocation Summary
@@ -523,14 +529,15 @@ if len(summary_df) == 1:
     }).reset_index()
 
 summary_df['priority_score'] = (
-    (summary_df['confirmed_cases'] / summary_df['confirmed_cases'].max() * 30) +
-    (summary_df['deaths'] / summary_df['deaths'].max() * 30) +
-    (summary_df['severe_cases'] / summary_df['severe_cases'].max() * 20) +
-    (summary_df['border_crossings'] / summary_df['border_crossings'].max() * 20)
+    (summary_df['confirmed_cases'] / summary_df['confirmed_cases'].max() * 30 if summary_df['confirmed_cases'].max() > 0 else 0) +
+    (summary_df['deaths'] / summary_df['deaths'].max() * 30 if summary_df['deaths'].max() > 0 else 0) +
+    (summary_df['severe_cases'] / summary_df['severe_cases'].max() * 20 if summary_df['severe_cases'].max() > 0 else 0) +
+    (summary_df['border_crossings'] / summary_df['border_crossings'].max() * 20 if summary_df['border_crossings'].max() > 0 else 0)
 ).round(1)
 
+total_priority = summary_df['priority_score'].sum()
 summary_df['funding_allocation'] = (
-    summary_df['priority_score'] / summary_df['priority_score'].sum() * 100
+    (summary_df['priority_score'] / total_priority * 100) if total_priority > 0 else 0
 ).round(1)
 
 summary_df = summary_df.sort_values('priority_score', ascending=False)
@@ -538,17 +545,20 @@ summary_df = summary_df.sort_values('priority_score', ascending=False)
 # Determine label column
 label_col = 'country' if 'country' in summary_df.columns and len(summary_df) > 1 else 'region'
 
-fig5 = px.bar(
-    summary_df,
-    x=label_col,
-    y='funding_allocation',
-    text='funding_allocation',
-    labels={'funding_allocation': 'Funding Allocation (%)', label_col: label_col.title()},
-    color='priority_score',
-    color_continuous_scale="Reds"
-)
-fig5.update_layout(height=350)
-st.plotly_chart(fig5, use_container_width=True)
+if len(summary_df) > 0:
+    fig5 = px.bar(
+        summary_df,
+        x=label_col,
+        y='funding_allocation',
+        text='funding_allocation',
+        labels={'funding_allocation': 'Funding Allocation (%)', label_col: label_col.title()},
+        color='priority_score',
+        color_continuous_scale="Reds"
+    )
+    fig5.update_layout(height=350)
+    st.plotly_chart(fig5, use_container_width=True)
+else:
+    st.warning("No data available to calculate resource allocation.")
 
 # ============================================================
 # Footer
